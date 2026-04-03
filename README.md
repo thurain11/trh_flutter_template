@@ -77,7 +77,7 @@ dart pub global activate --source path .
 ## Install globally (GitHub)
 
 ```bash
-dart pub global activate --source git https://github.com/<username>/<repo>.git
+dart pub global activate --source git https://github.com/thurain11/trh_flutter_template.git
 ```
 
 Then inside any Flutter project:
@@ -102,7 +102,7 @@ git init
 git add .
 git commit -m "feat: initial trh_template CLI"
 git branch -M main
-git remote add origin https://github.com/<username>/<repo>.git
+git remote add origin https://github.com/thurain11/trh_flutter_template.git
 git push -u origin main
 ```
 
