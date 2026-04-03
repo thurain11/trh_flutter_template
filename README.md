@@ -2,6 +2,11 @@
 
 `trh_template` is a Dart CLI command for Flutter projects.
 
+## Prerequisites
+
+- Git
+- Dart SDK 3.3+ (or Flutter SDK with bundled Dart)
+
 It creates:
 
 - `lib/builders`
@@ -80,6 +85,26 @@ dart pub global activate --source path .
 dart pub global activate --source git https://github.com/thurain11/trh_flutter_template.git
 ```
 
+## Update to latest
+
+```bash
+dart pub global activate --source git https://github.com/thurain11/trh_flutter_template.git
+```
+
+## If command not found
+
+If `trh_template: command not found`, add pub cache bin to your `PATH`:
+
+```bash
+export PATH="$PATH:$HOME/.pub-cache/bin"
+```
+
+Then restart terminal and run:
+
+```bash
+trh_template --help
+```
+
 Then inside any Flutter project:
 
 ```bash
@@ -92,19 +117,27 @@ Create a page:
 trh_template page --name home
 ```
 
-## GitHub Publish Commands
+## Quick output example
 
-Create repo and push:
+After running:
 
 ```bash
-cd /Users/thurainhein/Documents/my_apps/trh_template
-git init
-git add .
-git commit -m "feat: initial trh_template CLI"
-git branch -M main
-git remote add origin https://github.com/thurain11/trh_flutter_template.git
-git push -u origin main
+trh_template
 ```
+
+You will get folders like:
+
+- `lib/builders/...`
+- `lib/core/...`
+- `lib/pages`
+- `lib/widgets`
+
+And starter files such as:
+
+- `lib/core/network/basenetwork.dart`
+- `lib/core/ob/pin_ob.dart`
+- `lib/core/ob/response_ob.dart`
+- `lib/builders/refresh_builder/refresh_ui_builder.dart`
 
 ## Options
 
