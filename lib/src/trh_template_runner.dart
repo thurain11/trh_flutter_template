@@ -83,6 +83,10 @@ const _dependencies = <String, String>{
 };
 
 const _fileTemplates = <String, String>{
+  'lib/builders/external_refresh_builder/external_refresh_ui_bloc.dart':
+      externalRefreshUiBlocTemplate,
+  'lib/builders/external_refresh_builder/external_refresh_ui_builder.dart':
+      externalRefreshUiBuilderTemplate,
   'lib/builders/refresh_builder/refresh_ui_bloc.dart': refreshUiBlocTemplate,
   'lib/builders/refresh_builder/refresh_ui_builder.dart':
       refreshUiBuilderTemplate,
