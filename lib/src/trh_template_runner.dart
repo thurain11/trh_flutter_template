@@ -24,6 +24,8 @@ const _folders = <String>[
   'lib/core/utils',
   'lib/pages',
   'lib/widgets',
+  'lib/widgets/common',
+  'lib/widgets/err_state_widget',
 ];
 
 const _files = <String>[
@@ -49,9 +51,22 @@ const _files = <String>[
   'lib/core/theme/app_theme.dart',
   'lib/core/utils/app_util.dart',
   'lib/core/utils/context_ext.dart',
+  'lib/widgets/common/loading_widget.dart',
+  'lib/widgets/err_state_widget/connection_timeout_widget.dart',
+  'lib/widgets/err_state_widget/err_widget.dart',
+  'lib/widgets/err_state_widget/more_widget.dart',
+  'lib/widgets/err_state_widget/no_internet_widget.dart',
+  'lib/widgets/err_state_widget/no_login_widget.dart',
+  'lib/widgets/err_state_widget/not_found_widget.dart',
+  'lib/widgets/err_state_widget/server_err_widget.dart',
+  'lib/widgets/err_state_widget/server_maintenance_widget.dart',
+  'lib/widgets/err_state_widget/simple_state_card.dart',
+  'lib/widgets/err_state_widget/too_many_request_widget.dart',
+  'lib/widgets/err_state_widget/unknown_err_widget.dart',
 ];
 
 const _dependencies = <String, String>{
+  'cupertino_icons': '^1.0.8',
   'dio': '^5.9.0',
   'rxdart': '^0.28.0',
   'shared_preferences': '^2.5.4',
@@ -59,6 +74,7 @@ const _dependencies = <String, String>{
   'permission_handler': '^12.0.1',
   'pretty_dio_logger': '^1.4.0',
   'pull_to_refresh': '^2.0.0',
+  'lottie': '^3.3.2',
   'provider': '^6.1.5+1',
   'image_picker': '^1.2.1',
   'toastification': 'any',
@@ -75,6 +91,7 @@ const _fileTemplates = <String, String>{
       singleUiBuilderTemplate,
   'lib/builders/request_button/request_button_bloc.dart':
       requestButtonBlocTemplate,
+  'lib/builders/request_button/request_button.dart': requestButtonTemplate,
   'lib/builders/factory/factory_builder.dart': factoryBuilderTemplate,
   'lib/builders/typedef/type_def.dart': typeDefTemplate,
   'lib/core/constants/app_constant.dart': appConstantTemplate,
@@ -86,6 +103,27 @@ const _fileTemplates = <String, String>{
   'lib/core/ob/pin_ob.dart': pinObTemplate,
   'lib/core/ob/response_ob.dart': responseObTemplate,
   'lib/core/utils/app_util.dart': appUtilTemplate,
+  'lib/core/providers/theme_provider.dart': themeProviderTemplate,
+  'lib/core/utils/context_ext.dart': contextExtTemplate,
+  'lib/widgets/common/loading_widget.dart': loadingWidgetTemplate,
+  'lib/widgets/err_state_widget/connection_timeout_widget.dart':
+      connectionTimeoutWidgetTemplate,
+  'lib/widgets/err_state_widget/err_widget.dart': errWidgetTemplate,
+  'lib/widgets/err_state_widget/more_widget.dart': moreWidgetTemplate,
+  'lib/widgets/err_state_widget/no_internet_widget.dart':
+      noInternetWidgetTemplate,
+  'lib/widgets/err_state_widget/no_login_widget.dart': noLoginWidgetTemplate,
+  'lib/widgets/err_state_widget/not_found_widget.dart': notFoundWidgetTemplate,
+  'lib/widgets/err_state_widget/server_err_widget.dart':
+      serverErrWidgetTemplate,
+  'lib/widgets/err_state_widget/server_maintenance_widget.dart':
+      serverMaintenanceWidgetTemplate,
+  'lib/widgets/err_state_widget/simple_state_card.dart':
+      simpleStateCardTemplate,
+  'lib/widgets/err_state_widget/too_many_request_widget.dart':
+      tooManyRequestWidgetTemplate,
+  'lib/widgets/err_state_widget/unknown_err_widget.dart':
+      unknownErrWidgetTemplate,
 };
 
 void runTrhTemplate(List<String> arguments) {

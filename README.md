@@ -28,6 +28,8 @@ It creates:
 - `lib/core/utils`
 - `lib/pages`
 - `lib/widgets`
+- `lib/widgets/common`
+- `lib/widgets/err_state_widget`
 
 And also creates core files:
 
@@ -56,8 +58,24 @@ It also creates builder files:
 - `lib/builders/single_ui_builder/single_ui_builder.dart`
 - `lib/builders/typedef/type_def.dart`
 
+It also creates widget files:
+
+- `lib/widgets/common/loading_widget.dart`
+- `lib/widgets/err_state_widget/connection_timeout_widget.dart`
+- `lib/widgets/err_state_widget/err_widget.dart`
+- `lib/widgets/err_state_widget/more_widget.dart`
+- `lib/widgets/err_state_widget/no_internet_widget.dart`
+- `lib/widgets/err_state_widget/no_login_widget.dart`
+- `lib/widgets/err_state_widget/not_found_widget.dart`
+- `lib/widgets/err_state_widget/server_err_widget.dart`
+- `lib/widgets/err_state_widget/server_maintenance_widget.dart`
+- `lib/widgets/err_state_widget/simple_state_card.dart`
+- `lib/widgets/err_state_widget/too_many_request_widget.dart`
+- `lib/widgets/err_state_widget/unknown_err_widget.dart`
+
 It also auto-adds these dependencies in target `pubspec.yaml` (only if missing):
 
+- `cupertino_icons: ^1.0.8`
 - `dio: ^5.9.0`
 - `rxdart: ^0.28.0`
 - `shared_preferences: ^2.5.4`
@@ -65,6 +83,7 @@ It also auto-adds these dependencies in target `pubspec.yaml` (only if missing):
 - `permission_handler: ^12.0.1`
 - `pretty_dio_logger: ^1.4.0`
 - `pull_to_refresh: ^2.0.0`
+- `lottie: ^3.3.2`
 - `provider: ^6.1.5+1`
 - `image_picker: ^1.2.1`
 - `toastification: any`

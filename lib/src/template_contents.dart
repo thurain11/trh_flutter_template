@@ -37,6 +37,7 @@ class SharedPref {
   static const language = "language";
   static const user_agent = "user_agent";
   static const shop_city = "shop_city";
+  static const theme = "theme";
 
   static Future<void> setData({required String key, dynamic value}) async {
     final pref = await SharedPreferences.getInstance();
@@ -60,6 +61,15 @@ class SharedPref {
   static Future<String> getData({required String key}) async {
     final pref = await SharedPreferences.getInstance();
     return pref.get(key).toString();
+  }
+
+  static Future<void> setString(
+      {required String key, required String value}) async {
+    await setData(key: key, value: value);
+  }
+
+  static Future<String> getString({required String key}) async {
+    return getData(key: key);
   }
 
   static Future<void> clearData({required String key}) async {
@@ -767,6 +777,439 @@ class AppUtils {
 }
 ''';
 
+const themeProviderTemplate = '''
+import 'package:flutter/material.dart';
+
+import '../database/share_pref.dart';
+
+class ThemeProvider extends ChangeNotifier {
+  ThemeMode themeMode = ThemeMode.light;
+
+  checkTheme() {
+    SharedPref.getString(key: SharedPref.theme).then((value) {
+      if (value != "null") {
+        if (value == "light") {
+          themeMode = ThemeMode.light;
+          notifyListeners();
+        } else if (value == "dark") {
+          themeMode = ThemeMode.dark;
+          notifyListeners();
+        } else {
+          themeMode = ThemeMode.system;
+          notifyListeners();
+        }
+      }
+    });
+  }
+
+  changeToDark() {
+    SharedPref.setString(key: SharedPref.theme, value: "dark");
+
+    themeMode = ThemeMode.dark;
+    notifyListeners();
+  }
+
+  changeToLight() {
+    SharedPref.setString(key: SharedPref.theme, value: "light");
+
+    themeMode = ThemeMode.light;
+
+    notifyListeners();
+  }
+
+  changeToSystem() {
+    SharedPref.setString(key: SharedPref.theme, value: "system");
+
+    themeMode = ThemeMode.system;
+
+    notifyListeners();
+  }
+}
+''';
+
+const contextExtTemplate = '''
+import 'package:flutter/material.dart';
+
+extension ContextExt on BuildContext {
+  Future<T?> to<T extends Object>(Widget widget,
+      {bool fullscreenDialog = false}) async {
+    return await Navigator.of(this).push<T>(MaterialPageRoute(
+        builder: (BuildContext context) {
+          return widget;
+        },
+        fullscreenDialog: fullscreenDialog));
+  }
+
+  void back<T extends Object>([T? result]) {
+    Navigator.of(this).pop<T>(result);
+  }
+
+  Future<T?> offAll<T extends Object>(Widget widget) async {
+    return await Navigator.of(this).pushAndRemoveUntil<T>(
+        MaterialPageRoute(builder: (BuildContext context) {
+      return widget;
+    }), (route) => false);
+  }
+
+  Future<T?> off<T extends Object, TO extends Object>(Widget widget) async {
+    return await Navigator.of(this)
+        .pushReplacement<T, TO>(MaterialPageRoute(builder: (BuildContext context) {
+      return widget;
+    }));
+  }
+
+  double get height => MediaQuery.of(this).size.height;
+
+  double get width => MediaQuery.of(this).size.width;
+
+  Size get size => MediaQuery.of(this).size;
+
+  // String toTrans(String txt) => AppTranslations.of(this)!.trans(txt);
+}
+''';
+
+const loadingWidgetTemplate = '''
+import 'package:flutter/material.dart';
+
+class LoadingWidget extends StatelessWidget {
+  final double? size;
+
+  const LoadingWidget({super.key, this.size});
+
+  @override
+  Widget build(BuildContext context) {
+    final double indicatorSize = size ?? 36;
+    return SizedBox(
+      width: indicatorSize,
+      height: indicatorSize,
+      child: const CircularProgressIndicator(strokeWidth: 3),
+    );
+  }
+}
+''';
+
+const connectionTimeoutWidgetTemplate = '''
+import 'package:flutter/material.dart';
+
+import 'simple_state_card.dart';
+
+class ConnectionTimeoutWidget extends StatelessWidget {
+  final VoidCallback? fun;
+  final double? widgetSize;
+
+  const ConnectionTimeoutWidget({super.key, this.fun, this.widgetSize});
+
+  @override
+  Widget build(BuildContext context) {
+    return SimpleStateCard(
+      icon: Icons.timer_off_outlined,
+      title: 'Connection timeout',
+      actionText: 'Retry',
+      onPressed: fun,
+      size: widgetSize,
+    );
+  }
+}
+''';
+
+const errWidgetTemplate = '''
+import 'package:flutter/material.dart';
+
+import '../../core/ob/response_ob.dart';
+import 'connection_timeout_widget.dart';
+import 'no_internet_widget.dart';
+import 'no_login_widget.dart';
+import 'not_found_widget.dart';
+import 'server_err_widget.dart';
+import 'server_maintenance_widget.dart';
+import 'too_many_request_widget.dart';
+import 'unknown_err_widget.dart';
+
+class ErrWidget extends StatelessWidget {
+  final ErrState? errState;
+  final VoidCallback? fun;
+  final double? widgetSize;
+
+  const ErrWidget(this.errState, this.fun, {super.key, this.widgetSize});
+
+  @override
+  Widget build(BuildContext context) {
+    switch (errState) {
+      case ErrState.no_internet:
+        return NoInternetWidget(fun: fun, widgetSize: widgetSize);
+      case ErrState.connection_timeout:
+        return ConnectionTimeoutWidget(fun: fun, widgetSize: widgetSize);
+      case ErrState.not_found:
+        return NotFoundWidget(fun: fun, widgetSize: widgetSize);
+      case ErrState.server_error:
+        return ServerErrWidget(fun: fun, widgetSize: widgetSize);
+      case ErrState.too_many_request:
+        return TooManyRequestWidget(fun: fun, widgetSize: widgetSize);
+      case ErrState.no_login:
+        return const NoLoginWidget();
+      case ErrState.server_maintain:
+        return ServerMaintenanceWidget(fun: fun, widgetSize: widgetSize);
+      case ErrState.unknown_err:
+      case ErrState.validate_err:
+      case ErrState.not_supported:
+      case null:
+        return UnknownErrWidget(fun: fun, widgetSize: widgetSize);
+    }
+  }
+}
+''';
+
+const moreWidgetTemplate = '''
+import 'package:flutter/material.dart';
+
+import 'simple_state_card.dart';
+
+class MoreWidget extends StatelessWidget {
+  final dynamic data;
+
+  const MoreWidget(this.data, {super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final String message = _messageFrom(data);
+    return SimpleStateCard(icon: Icons.info_outline, title: message);
+  }
+
+  String _messageFrom(dynamic value) {
+    if (value is Map<String, dynamic>) {
+      final dynamic msg = value['message'] ?? value['msg'] ?? value['error'];
+      if (msg != null && msg.toString().trim().isNotEmpty) {
+        return msg.toString();
+      }
+    } else if (value != null) {
+      final String txt = value.toString().trim();
+      if (txt.isNotEmpty) return txt;
+    }
+    return 'Something went wrong';
+  }
+}
+''';
+
+const noInternetWidgetTemplate = '''
+import 'package:flutter/material.dart';
+
+import 'simple_state_card.dart';
+
+class NoInternetWidget extends StatelessWidget {
+  final VoidCallback? fun;
+  final double? widgetSize;
+
+  const NoInternetWidget({super.key, this.fun, this.widgetSize});
+
+  @override
+  Widget build(BuildContext context) {
+    return SimpleStateCard(
+      icon: Icons.wifi_off_outlined,
+      title: 'No internet connection',
+      actionText: 'Retry',
+      onPressed: fun,
+      size: widgetSize,
+    );
+  }
+}
+''';
+
+const noLoginWidgetTemplate = '''
+import 'package:flutter/material.dart';
+
+import 'simple_state_card.dart';
+
+class NoLoginWidget extends StatelessWidget {
+  final String? message;
+
+  const NoLoginWidget({super.key, this.message});
+
+  @override
+  Widget build(BuildContext context) {
+    return SimpleStateCard(
+      icon: Icons.lock_outline,
+      title: message ?? 'You need to login',
+    );
+  }
+}
+''';
+
+const notFoundWidgetTemplate = '''
+import 'package:flutter/material.dart';
+
+import 'simple_state_card.dart';
+
+class NotFoundWidget extends StatelessWidget {
+  final VoidCallback? fun;
+  final double? widgetSize;
+
+  const NotFoundWidget({super.key, this.fun, this.widgetSize});
+
+  @override
+  Widget build(BuildContext context) {
+    return SimpleStateCard(
+      icon: Icons.search_off_outlined,
+      title: 'Data not found',
+      actionText: 'Retry',
+      onPressed: fun,
+      size: widgetSize,
+    );
+  }
+}
+''';
+
+const serverErrWidgetTemplate = '''
+import 'package:flutter/material.dart';
+
+import 'simple_state_card.dart';
+
+class ServerErrWidget extends StatelessWidget {
+  final VoidCallback? fun;
+  final double? widgetSize;
+
+  const ServerErrWidget({super.key, this.fun, this.widgetSize});
+
+  @override
+  Widget build(BuildContext context) {
+    return SimpleStateCard(
+      icon: Icons.cloud_off_outlined,
+      title: 'Internal server error',
+      actionText: 'Retry',
+      onPressed: fun,
+      size: widgetSize,
+    );
+  }
+}
+''';
+
+const serverMaintenanceWidgetTemplate = '''
+import 'package:flutter/material.dart';
+
+import 'simple_state_card.dart';
+
+class ServerMaintenanceWidget extends StatelessWidget {
+  final VoidCallback? fun;
+  final double? widgetSize;
+
+  const ServerMaintenanceWidget({super.key, this.fun, this.widgetSize});
+
+  @override
+  Widget build(BuildContext context) {
+    return SimpleStateCard(
+      icon: Icons.settings_suggest_outlined,
+      title: 'Server is under maintenance',
+      actionText: 'Retry',
+      onPressed: fun,
+      size: widgetSize,
+    );
+  }
+}
+''';
+
+const simpleStateCardTemplate = '''
+import 'package:flutter/material.dart';
+
+class SimpleStateCard extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String? actionText;
+  final VoidCallback? onPressed;
+  final double? size;
+
+  const SimpleStateCard({
+    super.key,
+    required this.icon,
+    required this.title,
+    this.actionText,
+    this.onPressed,
+    this.size,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final ThemeData theme = Theme.of(context);
+    final double iconSize = size ?? 44;
+    final bool hasAction =
+        (actionText?.isNotEmpty ?? false) && onPressed != null;
+
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Card(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: <Widget>[
+                Icon(icon, size: iconSize, color: theme.colorScheme.primary),
+                const SizedBox(height: 12),
+                Text(
+                  title,
+                  textAlign: TextAlign.center,
+                  style: theme.textTheme.titleMedium,
+                ),
+                if (hasAction) ...<Widget>[
+                  const SizedBox(height: 16),
+                  FilledButton(onPressed: onPressed, child: Text(actionText!)),
+                ],
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+''';
+
+const tooManyRequestWidgetTemplate = '''
+import 'package:flutter/material.dart';
+
+import 'simple_state_card.dart';
+
+class TooManyRequestWidget extends StatelessWidget {
+  final VoidCallback? fun;
+  final double? widgetSize;
+
+  const TooManyRequestWidget({super.key, this.fun, this.widgetSize});
+
+  @override
+  Widget build(BuildContext context) {
+    return SimpleStateCard(
+      icon: Icons.hourglass_top_outlined,
+      title: 'Too many requests',
+      actionText: 'Retry',
+      onPressed: fun,
+      size: widgetSize,
+    );
+  }
+}
+''';
+
+const unknownErrWidgetTemplate = '''
+import 'package:flutter/material.dart';
+
+import 'simple_state_card.dart';
+
+class UnknownErrWidget extends StatelessWidget {
+  final VoidCallback? fun;
+  final double? widgetSize;
+
+  const UnknownErrWidget({super.key, this.fun, this.widgetSize});
+
+  @override
+  Widget build(BuildContext context) {
+    return SimpleStateCard(
+      icon: Icons.error_outline,
+      title: 'Unknown error',
+      actionText: 'Retry',
+      onPressed: fun,
+      size: widgetSize,
+    );
+  }
+}
+''';
+
 const refreshUiBlocTemplate = '''
 import 'package:rxdart/rxdart.dart';
 
@@ -879,10 +1322,16 @@ class RefreshUiBloc<T extends Object?> extends DioBaseNetwork {
 const refreshUiBuilderTemplate = '''
 import 'package:clean_archi/builders/refresh_builder/refresh_ui_bloc.dart';
 import 'package:flutter/material.dart';
+import 'package:lottie/lottie.dart';
 import 'package:pull_to_refresh/pull_to_refresh.dart';
 
 import '../../core/network/basenetwork.dart';
 import '../../core/ob/response_ob.dart';
+import '../../core/utils/app_util.dart';
+import '../../widgets/common/loading_widget.dart';
+import '../../widgets/err_state_widget/err_widget.dart';
+import '../../widgets/err_state_widget/more_widget.dart';
+import '../../widgets/err_state_widget/unknown_err_widget.dart';
 import '../typedef/type_def.dart';
 
 typedef Widget ChildWidget<T extends Object>(T data, RefreshLoad func, bool? isList);
@@ -1203,7 +1652,7 @@ class RefreshUiBuilderState<T> extends State<RefreshUiBuilder>
                                             height: 10.0,
                                           ),
                                           Text(
-                                            tr("no_data"),
+                                            "No Data",
                                             textAlign: TextAlign.center,
                                             style: TextStyle(
                                               fontWeight: FontWeight.bold,
@@ -1386,6 +1835,16 @@ import 'package:flutter/material.dart';
 
 import '../../core/network/basenetwork.dart';
 import '../../core/ob/response_ob.dart';
+import '../../core/utils/context_ext.dart';
+import '../../widgets/common/loading_widget.dart';
+import '../../widgets/err_state_widget/connection_timeout_widget.dart';
+import '../../widgets/err_state_widget/no_internet_widget.dart';
+import '../../widgets/err_state_widget/no_login_widget.dart';
+import '../../widgets/err_state_widget/not_found_widget.dart';
+import '../../widgets/err_state_widget/server_err_widget.dart';
+import '../../widgets/err_state_widget/server_maintenance_widget.dart';
+import '../../widgets/err_state_widget/too_many_request_widget.dart';
+import '../../widgets/err_state_widget/unknown_err_widget.dart';
 import '../typedef/type_def.dart';
 
 typedef Widget MainWidget(dynamic data, RefreshLoad reload);
@@ -1556,7 +2015,6 @@ class SingleUiBuilderState<T> extends State<SingleUiBuilder> {
                       requestType: widget.requestType,
                     );
                   },
-                  imgSize: widget.widgetSize,
                 );
               } else if (rv.errState == ErrState.not_found) {
                 return Center(
@@ -1591,7 +2049,7 @@ class SingleUiBuilderState<T> extends State<SingleUiBuilder> {
                   widgetSize: widget.widgetSize,
                 );
               } else if (rv.errState == ErrState.server_maintain) {
-                return ServerMaintenance(widgetSize: widget.widgetSize);
+                return ServerMaintenanceWidget(widgetSize: widget.widgetSize);
               } else if (rv.errState == ErrState.no_login) {
                 if (rv.data is Map<String, dynamic>) {
                   return NoLoginWidget(
@@ -1787,6 +2245,434 @@ class RequestButtonBloc extends DioBaseNetwork {
 
   void disponse() {
     requestButtonController.close();
+  }
+}
+''';
+
+const requestButtonTemplate = '''
+import 'dart:convert';
+
+import 'package:dio/dio.dart';
+import 'package:flutter/cupertino.dart';
+import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+
+import '../../core/network/basenetwork.dart';
+import '../../core/ob/response_ob.dart';
+import '../../core/providers/theme_provider.dart';
+import '../../core/utils/app_util.dart';
+import '../../widgets/common/loading_widget.dart';
+import 'request_button_bloc.dart';
+
+typedef dynamic OnPressed();
+typedef Future<Map<String, dynamic>?>? onAsyncPressed();
+
+typedef void SuccessFuncMethod(ResponseOb ob);
+typedef void ValidFuncMethod(ResponseOb ob);
+typedef void MoreFuncMethod(ResponseOb ob);
+typedef void StateFuncMethod(ResponseOb ob);
+
+class RequestButton extends StatefulWidget {
+  String? url; //request url
+  String? text; //
+  ScaffoldState? scaffoldState;
+  bool changeFormData; //dio request -> true/false
+  bool isShowDialog; //true
+  Color textColor;
+  Color? color;
+  EdgeInsetsGeometry padding;
+  TextStyle? textStyle;
+  SuccessFuncMethod successFunc;
+  StateFuncMethod? stateFunc;
+  MoreFuncMethod? moreFunc;
+  OnPressed? onPress; //Map
+  onAsyncPressed? onAsyncPress; //Map<>
+  Function? errorFunc; //
+  ValidFuncMethod? validFunc;
+  ReqType requestType;
+  bool isDisable;
+  double borderRadius;
+  BorderRadius? bRadius;
+  bool showErrSnack;
+  Widget? icon;
+  Widget? loadingWidget;
+  bool showLoading;
+  Color borderColor;
+  double borderWidth;
+  bool isAlreadyFormData;
+  TextAlign? align;
+  String? tempId;
+  bool isCupertino;
+
+  RequestButton(
+      {required this.url,
+      required this.text,
+      this.scaffoldState,
+      required this.successFunc,
+      this.stateFunc,
+      this.moreFunc,
+      this.errorFunc,
+      this.isAlreadyFormData = false,
+      this.showLoading = true,
+      this.onPress,
+      this.onAsyncPress,
+      this.changeFormData = false,
+      this.textColor = Colors.white,
+      this.color,
+      this.padding = const EdgeInsets.all(10),
+      this.isShowDialog = false,
+      this.textStyle,
+      this.align,
+      this.validFunc,
+      this.requestType = ReqType.Post,
+      this.isDisable = false,
+      this.borderRadius = 5,
+      this.bRadius,
+      this.showErrSnack = true,
+      this.icon,
+      this.loadingWidget,
+      this.borderColor = Colors.transparent,
+      this.isCupertino = false,
+      this.borderWidth = 0.0,
+      this.tempId = ''});
+
+  @override
+  _RequestButtonState createState() => _RequestButtonState();
+}
+
+class _RequestButtonState extends State<RequestButton> {
+  final _bloc = RequestButtonBloc();
+
+  bool isShowingDialog = false;
+
+  @override
+  void initState() {
+    super.initState();
+
+    _bloc.getRequestStream().listen((ResponseOb resp) {
+      if (widget.stateFunc != null) {
+        widget.stateFunc!(resp);
+      }
+
+      if (resp.message == MsgState.data) {
+        if (widget.isShowDialog) {
+          if (isShowingDialog) {
+            Navigator.of(context).pop();
+          }
+        }
+        widget.successFunc(resp);
+      }
+
+      if (resp.message == MsgState.more) {
+        if (widget.isShowDialog) {
+          if (isShowingDialog) {
+            Navigator.of(context).pop();
+          }
+        }
+        if (widget.errorFunc == null) {
+          if (widget.showErrSnack) {
+            // AppUtils.moreResponse(resp, context);
+          }
+          if (widget.moreFunc != null) {
+            Map<String, dynamic> moreMap = resp.data;
+            widget.moreFunc!(resp);
+          } else if (widget.moreFunc == null) {
+            Map<String, dynamic> moreMap = resp.data;
+          }
+        } else {
+          widget.errorFunc!();
+        }
+      }
+
+      if (resp.message == MsgState.error) {
+        if (resp.errState == ErrState.no_login) {
+          //&& widget.errorFunc == null
+        }
+
+        if (widget.isShowDialog) {
+          if (isShowingDialog) {
+            Navigator.of(context).pop();
+          }
+        }
+
+        if (widget.errorFunc == null) {
+          if (widget.scaffoldState != null) {
+            ToastHelper.checkError(resp, context: context);
+          } else {
+            if (widget.showErrSnack) {
+              // ToastHelper.showErrorToast(title: "Error", context: context);
+              // toastification.show(
+              //   context: context, // optional if you use ToastificationWrapper
+              //   title: Text('Hello, world!'),
+              //   autoCloseDuration: const Duration(seconds: 5),
+              // );
+
+              ToastHelper.checkError(resp, context: context);
+            } else {
+              if (resp.errState == ErrState.server_error) {
+                ToastHelper.showErrorToast(
+                    title: "Internal Server Error", context: context);
+              }
+
+              if (resp.errState == ErrState.no_internet) {
+                // ToastHelper.sh("No Internet connection!", color: Colors.redAccent,context: context);
+                ToastHelper.showErrorToast(
+                    title: "No Internet connection!", context: context);
+              }
+
+              if (resp.errState == ErrState.not_found) {
+                ToastHelper.showErrorToast(
+                    title: "Your requested data not found!", context: context);
+              }
+
+              if (resp.errState == ErrState.connection_timeout) {
+                ToastHelper.showErrorToast(
+                    title: "Connection Timeout! Try Again!", context: context);
+              }
+            }
+          }
+        } else {
+          widget.errorFunc!();
+          if (widget.showErrSnack) {
+            if (widget.scaffoldState != null) {
+              ToastHelper.checkError(resp, context: context);
+            } else {
+              ToastHelper.checkError(resp, context: context);
+            }
+          }
+        }
+
+        if (resp.errState == ErrState.validate_err) {
+          if (widget.validFunc != null) {
+            resp.data = json.decode(resp.data);
+            widget.validFunc!(resp);
+          }
+        }
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<ResponseOb>(
+      initialData: ResponseOb(),
+      stream: _bloc.getRequestStream(),
+      builder: (context, snapshot) {
+        ResponseOb? resp = snapshot.data;
+        if (widget.showLoading) {
+          if (resp!.message == MsgState.loading &&
+              widget.isShowDialog == false) {
+            return Center(
+              child: widget.loadingWidget ?? LoadingWidget(),
+            );
+          } else {
+            return widget.isCupertino ? cupertinoWidget() : mainWidget();
+          }
+        } else {
+          return widget.isCupertino ? cupertinoWidget() : mainWidget();
+        }
+      },
+    );
+  }
+
+  Widget cupertinoWidget() {
+    return CupertinoButton(
+        padding: widget.padding,
+        borderRadius: widget.bRadius == null
+            ? BorderRadius.circular(widget.borderRadius)
+            : widget.bRadius!,
+        onPressed: widget.isDisable
+            ? null
+            : () async {
+                if (widget.onPress != null) {
+                  if (widget.onPress!() != null) {
+                    Map<String, dynamic> map = widget.onPress!();
+
+                    checkDialog();
+                    if (map['is_logout'] == true) {
+                      debugPrint(
+                          'is_logout=true, skip NotificationSubscribeService.logoutSubscribe');
+                    }
+                    if (widget.isAlreadyFormData) {
+                      _bloc.postData(
+                        widget.url,
+                        fd: widget.onPress!(),
+                        requestType: widget.requestType,
+                      );
+                    } else {
+                      if (!widget.changeFormData) {
+                        _bloc.postData(
+                          widget.url,
+                          map: widget.onPress!(),
+                          requestType: widget.requestType,
+                        );
+                      } else {
+                        FormData fd = FormData.fromMap(widget.onPress!());
+                        _bloc.postData(
+                          widget.url,
+                          fd: fd,
+                          requestType: widget.requestType,
+                        );
+                      }
+                    }
+                  }
+                } else {
+                  await widget.onAsyncPress!()!.then((a) {
+                    if (a != null) {
+                      checkDialog();
+                      if (widget.requestType == ReqType.Get) {
+                        _bloc.postData(
+                          widget.url,
+                          map: a,
+                          requestType: widget.requestType,
+                        );
+                      } else {
+                        FormData fd = FormData.fromMap(a);
+                        _bloc.postData(
+                          widget.url,
+                          fd: fd,
+                          requestType: widget.requestType,
+                        );
+                      }
+                    }
+                  });
+                }
+              },
+        child: widget.icon != null
+            ? Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  widget.icon!,
+                  SizedBox(
+                    width: 5,
+                  ),
+                  Flexible(
+                      child: Text(
+                    widget.text!,
+                    style: widget.textStyle ??
+                        Theme.of(context).textTheme.labelMedium,
+                    textAlign: TextAlign.center,
+                  )),
+                ],
+              )
+            : Center(
+                child: Text(
+                  widget.text!,
+                  style: widget.textStyle ??
+                      Theme.of(context).textTheme.labelMedium,
+                ),
+              ));
+  }
+
+  Widget mainWidget() {
+    return Consumer<ThemeProvider>(
+        builder: (context, ThemeProvider provider, child) {
+      return TextButton.icon(
+        style: TextButton.styleFrom(
+          shape: widget.isCupertino
+              ? RoundedRectangleBorder()
+              : RoundedRectangleBorder(
+                  borderRadius: widget.bRadius == null
+                      ? BorderRadius.circular(widget.borderRadius)
+                      : widget.bRadius!,
+                  side: BorderSide(
+                      color: widget.borderColor, width: widget.borderWidth)),
+          padding: widget.padding,
+          backgroundColor: widget.color ?? Theme.of(context).primaryColor,
+          foregroundColor: provider.themeMode == ThemeMode.dark
+              ? Colors.black
+              : Colors.white,
+          // disabledColor: Colors.grey,
+        ),
+        onPressed: widget.isDisable
+            ? null
+            : () async {
+                if (widget.onPress != null) {
+                  // if (widget.onPress!() != null) {
+
+                  checkDialog();
+                  if (widget.isAlreadyFormData) {
+                    _bloc.postData(widget.url,
+                        fd: widget.onPress!(),
+                        requestType: widget.requestType,
+                        tempId: widget.tempId);
+                  } else {
+                    if (!widget.changeFormData) {
+                      _bloc.postData(widget.url,
+                          map: await widget.onPress!(),
+                          requestType: widget.requestType,
+                          tempId: widget.tempId);
+                    } else {
+                      FormData fd = FormData.fromMap(widget.onPress!());
+                      _bloc.postData(widget.url,
+                          fd: fd,
+                          requestType: widget.requestType,
+                          tempId: widget.tempId);
+                    }
+                  }
+                  // }
+                } else {
+                  await widget.onAsyncPress!()!.then((a) {
+                    if (a != null) {
+                      checkDialog();
+                      if (widget.requestType == ReqType.Get) {
+                        _bloc.postData(widget.url,
+                            map: a,
+                            requestType: widget.requestType,
+                            tempId: widget.tempId);
+                      } else {
+                        FormData fd = FormData.fromMap(a);
+                        _bloc.postData(widget.url,
+                            fd: fd,
+                            requestType: widget.requestType,
+                            tempId: widget.tempId);
+                      }
+                    }
+                  });
+                }
+              },
+        label: Text(
+          widget.text!,
+          style: widget.textStyle,
+          textAlign: TextAlign.center,
+        ),
+        icon: widget.icon == null ? null : widget.icon,
+      );
+    });
+  }
+
+  checkDialog() async {
+    if (widget.isShowDialog) {
+      isShowingDialog = true;
+      await showDialog(
+          barrierDismissible: false,
+          context: context,
+          builder: (context) {
+            return Stack(
+              // overflow: Overflow.visible,
+              alignment: Alignment.center,
+              children: <Widget>[
+                Container(
+                  width: 100,
+                  height: 100,
+                  decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(12),
+                      color: Colors.white),
+                  child: LoadingWidget(),
+                ),
+              ],
+            );
+          }).then((v) {
+        isShowingDialog = false;
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    _bloc.disponse();
+    super.dispose();
   }
 }
 ''';
