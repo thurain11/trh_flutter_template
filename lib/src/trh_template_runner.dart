@@ -5,7 +5,7 @@ import 'package:args/args.dart';
 
 import 'template_contents.dart';
 
-const _currentCliVersion = '0.1.2';
+const _currentCliVersion = '0.1.3';
 const _repoUrl = 'https://github.com/thurain11/trh_flutter_template.git';
 const _ansiReset = '\x1B[0m';
 const _ansiYellow = '\x1B[33m';
