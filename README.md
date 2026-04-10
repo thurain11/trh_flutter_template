@@ -138,6 +138,16 @@ Then restart terminal and run:
 trh_template --help
 ```
 
+## Optional: avoid GitHub API rate limits
+
+If update-check hits GitHub rate limit, set a token:
+
+```bash
+export GITHUB_TOKEN=your_github_personal_access_token
+```
+
+(`GH_TOKEN` is also supported.)
+
 Then inside any Flutter project:
 
 ```bash

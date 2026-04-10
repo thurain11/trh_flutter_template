@@ -5,7 +5,7 @@ import 'package:args/args.dart';
 
 import 'template_contents.dart';
 
-const _currentCliVersion = '0.1.1';
+const _currentCliVersion = '0.1.2';
 const _repoUrl = 'https://github.com/thurain11/trh_flutter_template.git';
 const _ansiReset = '\x1B[0m';
 const _ansiYellow = '\x1B[33m';
@@ -585,7 +585,7 @@ Future<String?> _buildUpdateMessage() async {
     }
 
     final latest =
-        await _fetchLatestVersion().timeout(const Duration(seconds: 2));
+        await _fetchLatestVersion().timeout(const Duration(seconds: 5));
     if (latest == null) {
       return cache == null
           ? null
@@ -691,6 +691,11 @@ Future<String?> _fetchVersionFromUrl(
         HttpHeaders.userAgentHeader, 'trh_template_cli/$_currentCliVersion');
     request.headers
         .set(HttpHeaders.acceptHeader, 'application/vnd.github+json');
+    final githubToken = _readGithubToken();
+    if (githubToken != null) {
+      request.headers
+          .set(HttpHeaders.authorizationHeader, 'Bearer $githubToken');
+    }
     final response = await request.close();
     if (response.statusCode != 200) {
       return null;
@@ -716,6 +721,18 @@ Future<String?> _fetchVersionFromUrl(
   } finally {
     httpClient.close(force: true);
   }
+}
+
+String? _readGithubToken() {
+  final token = Platform.environment['GITHUB_TOKEN']?.trim();
+  if (token != null && token.isNotEmpty) {
+    return token;
+  }
+  final ghToken = Platform.environment['GH_TOKEN']?.trim();
+  if (ghToken != null && ghToken.isNotEmpty) {
+    return ghToken;
+  }
+  return null;
 }
 
 String _normalizeVersion(String raw) =>
