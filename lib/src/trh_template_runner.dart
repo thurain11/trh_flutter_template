@@ -1,8 +1,12 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:args/args.dart';
 
 import 'template_contents.dart';
+
+const _currentCliVersion = '0.1.0';
+const _repoUrl = 'https://github.com/thurain11/trh_flutter_template.git';
 
 const _folders = <String>[
   'lib/builders',
@@ -16,7 +20,7 @@ const _folders = <String>[
   'lib/core/constants',
   'lib/core/database',
   'lib/core/network',
-  'lib/core/ob',
+  'lib/core/models',
   'lib/core/providers',
   'lib/core/routes',
   'lib/core/services',
@@ -43,8 +47,8 @@ const _files = <String>[
   'lib/core/constants/app_constant.dart',
   'lib/core/database/share_pref.dart',
   'lib/core/network/basenetwork.dart',
-  'lib/core/ob/pin_ob.dart',
-  'lib/core/ob/response_ob.dart',
+  'lib/core/models/pin_ob.dart',
+  'lib/core/models/response_ob.dart',
   'lib/core/providers/theme_provider.dart',
   'lib/core/routes/routes.dart',
   'lib/core/services/service_locatior.dart',
@@ -104,8 +108,8 @@ const _fileTemplates = <String, String>{
   'lib/core/routes/routes.dart': routesTemplate,
   'lib/core/services/service_locatior.dart': serviceLocatorTemplate,
   'lib/core/theme/app_theme.dart': appThemeTemplate,
-  'lib/core/ob/pin_ob.dart': pinObTemplate,
-  'lib/core/ob/response_ob.dart': responseObTemplate,
+  'lib/core/models/pin_ob.dart': pinObTemplate,
+  'lib/core/models/response_ob.dart': responseObTemplate,
   'lib/core/utils/app_util.dart': appUtilTemplate,
   'lib/core/providers/theme_provider.dart': themeProviderTemplate,
   'lib/core/utils/context_ext.dart': contextExtTemplate,
@@ -130,13 +134,19 @@ const _fileTemplates = <String, String>{
       unknownErrWidgetTemplate,
 };
 
-void runTrhTemplate(List<String> arguments) {
+Future<void> runTrhTemplate(List<String> arguments) async {
   final parser = ArgParser()
     ..addFlag(
       'help',
       abbr: 'h',
       negatable: false,
       help: 'Show usage information.',
+    )
+    ..addFlag(
+      'version',
+      abbr: 'v',
+      negatable: false,
+      help: 'Show CLI version.',
     )
     ..addOption(
       'path',
@@ -183,6 +193,16 @@ void runTrhTemplate(List<String> arguments) {
   if (results['help'] as bool) {
     _printUsage(parser);
     return;
+  }
+
+  if (results['version'] as bool) {
+    stdout.writeln('trh_template $_currentCliVersion');
+    return;
+  }
+
+  final updateMessage = await _buildUpdateMessage();
+  if (updateMessage != null) {
+    stdout.writeln(updateMessage);
   }
 
   final pathInput = (results['path'] as String?)?.trim();
@@ -526,4 +546,194 @@ bool _isFlutterProject(String path) {
 
   final content = pubspec.readAsStringSync();
   return RegExp(r'^\s*flutter\s*:', multiLine: true).hasMatch(content);
+}
+
+Future<String?> _buildUpdateMessage() async {
+  try {
+    final cacheFile = _updateCacheFile();
+    final cache = _readUpdateCache(cacheFile);
+    final now = DateTime.now().toUtc();
+
+    if (cache != null) {
+      final checkedAtRaw = cache['checkedAt'] as String?;
+      final latestRaw = cache['latestVersion'] as String?;
+      final checkedAt =
+          checkedAtRaw == null ? null : DateTime.tryParse(checkedAtRaw);
+      if (checkedAt != null && latestRaw != null) {
+        final age = now.difference(checkedAt);
+        if (age.inHours < 12) {
+          return _renderUpdateMessageIfNeeded(latestRaw);
+        }
+      }
+    }
+
+    final latest =
+        await _fetchLatestVersion().timeout(const Duration(seconds: 2));
+    if (latest == null) {
+      return cache == null
+          ? null
+          : _renderUpdateMessageIfNeeded(cache['latestVersion'] as String?);
+    }
+
+    _writeUpdateCache(cacheFile, latestVersion: latest, checkedAtUtc: now);
+    return _renderUpdateMessageIfNeeded(latest);
+  } catch (_) {
+    return null;
+  }
+}
+
+File _updateCacheFile() {
+  final home = Platform.environment['HOME'];
+  if (home == null || home.isEmpty) {
+    return File('${Directory.systemTemp.path}/trh_template_update_cache.json');
+  }
+  final dir = Directory('$home/.trh_template_cli');
+  if (!dir.existsSync()) {
+    dir.createSync(recursive: true);
+  }
+  return File('${dir.path}/update_cache.json');
+}
+
+Map<String, dynamic>? _readUpdateCache(File file) {
+  if (!file.existsSync()) {
+    return null;
+  }
+  try {
+    final content = file.readAsStringSync();
+    final decoded = jsonDecode(content);
+    if (decoded is Map<String, dynamic>) {
+      return decoded;
+    }
+  } catch (_) {}
+  return null;
+}
+
+void _writeUpdateCache(
+  File file, {
+  required String latestVersion,
+  required DateTime checkedAtUtc,
+}) {
+  try {
+    file.writeAsStringSync(
+      jsonEncode({
+        'latestVersion': latestVersion,
+        'checkedAt': checkedAtUtc.toIso8601String(),
+      }),
+    );
+  } catch (_) {}
+}
+
+Future<String?> _fetchLatestVersion() async {
+  final ownerRepo = _parseOwnerRepo(_repoUrl);
+  if (ownerRepo == null) {
+    return null;
+  }
+
+  final releaseVersion = await _fetchVersionFromUrl(
+    'https://api.github.com/repos/${ownerRepo.$1}/${ownerRepo.$2}/releases/latest',
+    key: 'tag_name',
+  );
+  if (releaseVersion != null) {
+    return _normalizeVersion(releaseVersion);
+  }
+
+  final tagVersion = await _fetchVersionFromUrl(
+    'https://api.github.com/repos/${ownerRepo.$1}/${ownerRepo.$2}/tags?per_page=1',
+    key: 'name',
+    isArray: true,
+  );
+  return tagVersion == null ? null : _normalizeVersion(tagVersion);
+}
+
+(String, String)? _parseOwnerRepo(String gitUrl) {
+  final uri = Uri.tryParse(gitUrl);
+  if (uri == null || uri.host != 'github.com') {
+    return null;
+  }
+  final segments = uri.pathSegments.where((s) => s.isNotEmpty).toList();
+  if (segments.length < 2) {
+    return null;
+  }
+  final owner = segments[0];
+  final repo = segments[1].replaceAll('.git', '');
+  if (owner.isEmpty || repo.isEmpty) {
+    return null;
+  }
+  return (owner, repo);
+}
+
+Future<String?> _fetchVersionFromUrl(
+  String url, {
+  required String key,
+  bool isArray = false,
+}) async {
+  final httpClient = HttpClient();
+  try {
+    final request = await httpClient.getUrl(Uri.parse(url));
+    request.headers.set(
+        HttpHeaders.userAgentHeader, 'trh_template_cli/$_currentCliVersion');
+    request.headers
+        .set(HttpHeaders.acceptHeader, 'application/vnd.github+json');
+    final response = await request.close();
+    if (response.statusCode != 200) {
+      return null;
+    }
+    final payload = await response.transform(utf8.decoder).join();
+    final decoded = jsonDecode(payload);
+
+    if (isArray) {
+      if (decoded is List &&
+          decoded.isNotEmpty &&
+          decoded.first is Map<String, dynamic>) {
+        return (decoded.first as Map<String, dynamic>)[key]?.toString();
+      }
+      return null;
+    }
+
+    if (decoded is Map<String, dynamic>) {
+      return decoded[key]?.toString();
+    }
+    return null;
+  } catch (_) {
+    return null;
+  } finally {
+    httpClient.close(force: true);
+  }
+}
+
+String _normalizeVersion(String raw) =>
+    raw.trim().replaceFirst(RegExp(r'^[vV]'), '');
+
+String? _renderUpdateMessageIfNeeded(String? latestRaw) {
+  if (latestRaw == null || latestRaw.trim().isEmpty) {
+    return null;
+  }
+  final latest = _normalizeVersion(latestRaw);
+  if (_compareVersions(_currentCliVersion, latest) >= 0) {
+    return null;
+  }
+  return 'New trh_template version available: $latest '
+      '(current: $_currentCliVersion). Run: '
+      'dart pub global activate --source git $_repoUrl';
+}
+
+int _compareVersions(String a, String b) {
+  final pa = _parseVersionParts(a);
+  final pb = _parseVersionParts(b);
+  final maxLen = pa.length > pb.length ? pa.length : pb.length;
+
+  for (var i = 0; i < maxLen; i++) {
+    final ai = i < pa.length ? pa[i] : 0;
+    final bi = i < pb.length ? pb[i] : 0;
+    if (ai != bi) {
+      return ai.compareTo(bi);
+    }
+  }
+  return 0;
+}
+
+List<int> _parseVersionParts(String version) {
+  final normalized = _normalizeVersion(version);
+  final main = normalized.split('-').first;
+  return main.split('.').map((part) => int.tryParse(part) ?? 0).toList();
 }

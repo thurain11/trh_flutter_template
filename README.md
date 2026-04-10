@@ -20,7 +20,7 @@ It creates:
 - `lib/core/constants`
 - `lib/core/database`
 - `lib/core/network`
-- `lib/core/ob`
+- `lib/core/models`
 - `lib/core/providers`
 - `lib/core/routes`
 - `lib/core/services`
@@ -36,7 +36,7 @@ And also creates core files:
 - `lib/core/constants/app_constant.dart`
 - `lib/core/database/share_pref.dart`
 - `lib/core/network/basenetwork.dart`
-- `lib/core/ob/response_ob.dart`
+- `lib/core/models/response_ob.dart`
 - `lib/core/providers/theme_provider.dart`
 - `lib/core/routes/routes.dart`
 - `lib/core/services/service_locatior.dart`
@@ -110,6 +110,14 @@ dart pub global activate --source git https://github.com/thurain11/trh_flutter_t
 dart pub global activate --source git https://github.com/thurain11/trh_flutter_template.git
 ```
 
+`trh_template` command run တိုင်း (12 hours cache နဲ့) GitHub latest version စစ်ပေးပြီး update ရှိရင် command hint ပြပါမယ်။
+
+Check current installed version:
+
+```bash
+trh_template --version
+```
+
 ## If command not found
 
 If `trh_template: command not found`, add pub cache bin to your `PATH`:
@@ -154,8 +162,8 @@ You will get folders like:
 And starter files such as:
 
 - `lib/core/network/basenetwork.dart`
-- `lib/core/ob/pin_ob.dart`
-- `lib/core/ob/response_ob.dart`
+- `lib/core/models/pin_ob.dart`
+- `lib/core/models/response_ob.dart`
 - `lib/builders/refresh_builder/refresh_ui_builder.dart`
 
 ## Options
@@ -167,6 +175,7 @@ trh_template --help
 - `-p, --path` target project path (default: current directory)
 - `--dry-run` preview without writing folders
 - `-f, --force` skip Flutter project validation
+- `-v, --version` show installed CLI version
 
 ## Commands
 

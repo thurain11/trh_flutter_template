@@ -8,7 +8,7 @@ const typeDefTemplate = '''
 import 'package:flutter/widgets.dart';
 
 import '../../core/network/basenetwork.dart';
-import '../../core/ob/response_ob.dart';
+import '../../core/models/response_ob.dart';
 
 typedef Widget MainWidget(dynamic data, RefreshLoad reload);
 typedef Widget More(dynamic data, RefreshLoad reload);
@@ -85,11 +85,23 @@ import 'dart:io';
 import 'package:dio/dio.dart';
 import 'package:pretty_dio_logger/pretty_dio_logger.dart';
 
-import '../constants/app_constant.dart';
 import '../database/share_pref.dart';
-import '../ob/response_ob.dart';
+import '../models/response_ob.dart';
 
 class DioBaseNetwork {
+  // Reusable static Dio instance for the entire app
+  static final Dio _dio = Dio()
+    ..interceptors.add(PrettyDioLogger(
+      requestHeader: true,
+      requestBody: true,
+      responseBody: true,
+      responseHeader: false,
+      error: true,
+      compact: true,
+      maxWidth: 90,
+      enabled: true,
+    ));
+
   Future<Map<String, String?>> getHeader() async {
     String os = "";
 
@@ -146,63 +158,47 @@ class DioBaseNetwork {
       FormData? fd,
       required callBackFunction callBack,
       bool? isCached = false}) async {
-    BaseOptions options = BaseOptions();
-    options.headers = await getHeader();
-
-    Dio dio = new Dio(options);
-
-    dio.interceptors.add(PrettyDioLogger(
-      requestHeader: true,
-      requestBody: true,
-      responseBody: true,
-      responseHeader: false,
-      error: true,
-      compact: true,
-      maxWidth: 90,
-      enabled: true,
-    ));
-
-    // dio.interceptors.add(LogInterceptor(
-    //     responseBody: true, requestBody: true, requestHeader: true, responseHeader: true));
+    
+    _dio.options.headers = await getHeader();
 
     if (isCached == true) {
-      // dio.interceptors.add(DioCacheManager(CacheConfig(baseUrl: url,)).interceptor);
+      // _dio.interceptors.add(DioCacheManager(CacheConfig(baseUrl: url,)).interceptor);
     }
 
     try {
       Response response;
       if (rt == ReqType.Get) {
         if (params == null) {
-          response = await dio.get(url);
+          response = await _dio.get(url);
         } else {
-          response = await dio.get(
+          response = await _dio.get(
             url,
             queryParameters: params,
           );
         }
       } else if (rt == ReqType.Put) {
         if (params == null && fd == null) {
-          response = await dio.put(url);
+          response = await _dio.put(url);
         } else {
-          response = await dio.put(url, data: fd ?? params);
+          response = await _dio.put(url, data: fd ?? params);
         }
       } else if (rt == ReqType.Patch) {
         if (params == null) {
-          response = await dio.patch(url);
+          response = await _dio.patch(url);
         } else {
-          response = await dio.patch(url, queryParameters: params);
+          response = await _dio.patch(url, queryParameters: params);
         }
       } else if (rt == ReqType.Delete) {
         if (params == null) {
-          response = await dio.delete(url);
+          response = await _dio.delete(url);
         } else {
-          response = await dio.delete(url, queryParameters: params);
+          response = await _dio.delete(url, queryParameters: params);
         }
       } else {
         if (params != null || fd != null) {
-          response = await dio.post(url, data: fd ?? params);
+          response = await _dio.post(url, data: fd ?? params);
         } else {
-          response = await dio.post(url);
+          response = await _dio.post(url);
         }
       }
 
@@ -279,22 +275,17 @@ class DioBaseNetwork {
       required callBackFunction callBack,
       ProgressCallbackFunction? progressCallback,
       CancelToken? cancelToken}) async {
-    BaseOptions options = BaseOptions();
+    
+    _dio.options.headers = await getHeader();
 
-    options.headers = await getHeader();
-
-    Dio dio = new Dio(options);
-
-    dio.interceptors.add(LogInterceptor(responseBody: true, requestBody: true));
-
-    // (dio.httpClientAdapter as DefaultHttpClientAdapter).onHttpClientCreate = (HttpClient client) {
+    // (_dio.httpClientAdapter as DefaultHttpClientAdapter).onHttpClientCreate = (HttpClient client) {
     //   client.badCertificateCallback = (X509Certificate cert, String host, int port) => true;
     //   return client;
     // };
 
     try {
       Response response;
-      response = await dio.post(url, data: fd ?? params,
+      response = await _dio.post(url, data: fd ?? params,
           onSendProgress: (int nowData, int totalData) {
         progressCallback!(nowData / totalData);
       }, cancelToken: cancelToken);
@@ -431,8 +422,6 @@ class BuildThemeData {
 const pinObTemplate = '''
 import 'package:flutter/foundation.dart';
 
-import '../../builders/factory/factory_builder.dart';
-
 class PnObClass<T extends Object?> {
   List<T?>? data;
   Links? links;
@@ -449,12 +438,16 @@ class PnObClass<T extends Object?> {
       this.message,
       this.pageImage});
 
-  PnObClass.fromJson(Map<String, dynamic> json) {
+  PnObClass.fromJson(Map<String, dynamic> json, {T Function(dynamic)? fromJson}) {
     if (json['data'] != null) {
       data = <T>[];
       json['data'].forEach((v) {
         debugPrint("Hi Hi \${v.runtimeType} \\n \$v");
-        data!.add(objectFactories[T]!(v));
+        if (fromJson != null) {
+          data!.add(fromJson(v));
+        } else {
+          data!.add(v as T);
+        }
       });
     }
     links = json['links'] != null ? Links.fromJson(json['links']) : null;
@@ -603,7 +596,7 @@ import 'package:go_router/go_router.dart';
 import 'package:toastification/toastification.dart';
 
 import '../network/basenetwork.dart';
-import '../ob/response_ob.dart';
+import '../models/response_ob.dart';
 
 enum SnackColor { Warning, Success, Error }
 
@@ -915,7 +908,7 @@ class ConnectionTimeoutWidget extends StatelessWidget {
 const errWidgetTemplate = '''
 import 'package:flutter/material.dart';
 
-import '../../core/ob/response_ob.dart';
+import '../../core/models/response_ob.dart';
 import 'connection_timeout_widget.dart';
 import 'no_internet_widget.dart';
 import 'no_login_widget.dart';
@@ -1215,7 +1208,7 @@ const externalRefreshUiBlocTemplate = '''
 //
 // import '../../core/constants/app_constants.dart';
 // import '../../core/network/dio_basenetwork.dart';
-// import '../../core/ob/response_ob.dart';
+// import '../../core/models/response_ob.dart';
 // import '../factory/factory_builder.dart';
 // //final factories = <Type, Function>{ObClass: (int x) => ObClass.fromJson(x)};
 //
@@ -1319,7 +1312,7 @@ const externalRefreshUiBuilderTemplate = '''
 // import 'package:pull_to_refresh/pull_to_refresh.dart';
 //
 // import '../../core/network/dio_basenetwork.dart';
-// import '../../core/ob/response_ob.dart';
+// import '../../core/models/response_ob.dart';
 // import '../../global.dart';
 // import '../../widgets/err_state_widget/connection_timeout_widget.dart';
 // import '../../widgets/err_state_widget/no_data_widget.dart';
@@ -1652,15 +1645,19 @@ import 'package:rxdart/rxdart.dart';
 
 import '../../core/constants/app_constant.dart';
 import '../../core/network/basenetwork.dart';
-import '../../core/ob/pin_ob.dart';
-import '../../core/ob/response_ob.dart';
+import '../../core/models/pin_ob.dart';
+import '../../core/models/response_ob.dart';
 
-class RefreshUiBloc<T extends Object?> extends DioBaseNetwork {
+class RefreshUiBloc<T extends Object?> {
+  final DioBaseNetwork _network = DioBaseNetwork();
   PublishSubject<ResponseOb> publishSubject = PublishSubject();
 
   Stream<ResponseOb> shopStream() => publishSubject.stream;
 
   String nextPageUrl = "";
+
+  T Function(dynamic)? fromJson;
+  RefreshUiBloc({this.fromJson});
 
   void getData(
     String url, {
@@ -1676,7 +1673,7 @@ class RefreshUiBloc<T extends Object?> extends DioBaseNetwork {
       publishSubject.sink.add(resp);
     }
 
-    dioReq(
+    _network.dioReq(
       requestType,
       url: isBaseUrl ? MAIN_URL + url : url,
       params: map,
@@ -1684,7 +1681,7 @@ class RefreshUiBloc<T extends Object?> extends DioBaseNetwork {
       callBack: (ResponseOb rv) {
         if (rv.message == MsgState.data) {
           if (rv.data["message"].toString() == "success") {
-            PnObClass<T> flv = PnObClass.fromJson(rv.data);
+            PnObClass<T> flv = PnObClass.fromJson(rv.data, fromJson: fromJson);
             nextPageUrl = flv.links!.next.toString();
             resp.message = MsgState.data;
             resp.pgState = PageState.first;
@@ -1713,7 +1710,7 @@ class RefreshUiBloc<T extends Object?> extends DioBaseNetwork {
   }) async {
     ResponseOb resp = ResponseOb(data: null, message: MsgState.loading);
     if (nextPageUrl != "null" && nextPageUrl != "") {
-      dioReq(
+      _network.dioReq(
         requestType,
         url: nextPageUrl,
         params: map,
@@ -1721,7 +1718,7 @@ class RefreshUiBloc<T extends Object?> extends DioBaseNetwork {
         callBack: (ResponseOb rv) {
           if (rv.message == MsgState.data) {
             if (rv.data["message"].toString() == "success") {
-              PnObClass<T> flv = PnObClass.fromJson(rv.data);
+              PnObClass<T> flv = PnObClass.fromJson(rv.data, fromJson: fromJson);
               nextPageUrl = flv.links!.next.toString();
               resp.message = MsgState.data;
               resp.pgState = PageState.other;
@@ -1763,7 +1760,7 @@ import 'package:lottie/lottie.dart';
 import 'package:pull_to_refresh/pull_to_refresh.dart';
 
 import '../../core/network/basenetwork.dart';
-import '../../core/ob/response_ob.dart';
+import '../../core/models/response_ob.dart';
 import '../../core/utils/app_util.dart';
 import '../../widgets/common/loading_widget.dart';
 import '../../widgets/err_state_widget/err_widget.dart';
@@ -2217,13 +2214,14 @@ import 'package:rxdart/rxdart.dart';
 
 import '../../core/constants/app_constant.dart';
 import '../../core/network/basenetwork.dart';
-import '../../core/ob/response_ob.dart';
-import '../factory/factory_builder.dart';
+import '../../core/models/response_ob.dart';
 
-class SingleUiBloc<T> extends DioBaseNetwork {
+class SingleUiBloc<T> {
+  final DioBaseNetwork _network = DioBaseNetwork();
   String url;
   bool isBaseUrl;
-  SingleUiBloc(this.url, {this.isBaseUrl = true});
+  T Function(dynamic)? fromJson;
+  SingleUiBloc(this.url, {this.isBaseUrl = true, this.fromJson});
   PublishSubject<ResponseOb> publishSubject = PublishSubject();
   Stream<ResponseOb> shopStream() => publishSubject.stream;
 
@@ -2237,13 +2235,18 @@ class SingleUiBloc<T> extends DioBaseNetwork {
       publishSubject.sink.add(resp);
     }
 
-    dioReq(requestType,
+    _network.dioReq(requestType,
         url: isBaseUrl ? MAIN_URL + url : url,
         params: map,
         isCached: isCached, callBack: (ResponseOb rv) {
       if (rv.message == MsgState.data) {
         if (rv.data["message"].toString() == "success") {
-          T? ob = objectFactories[T]!(rv.data); //
+          T? ob;
+          if (fromJson != null) {
+            ob = fromJson!(rv.data);
+          } else {
+            ob = rv.data as T?;
+          }
           resp.message = MsgState.data;
           resp.data = ob;
           publishSubject.sink.add(resp);
@@ -2271,7 +2274,7 @@ import 'package:clean_archi/builders/single_ui_builder/single_ui_bloc.dart';
 import 'package:flutter/material.dart';
 
 import '../../core/network/basenetwork.dart';
-import '../../core/ob/response_ob.dart';
+import '../../core/models/response_ob.dart';
 import '../../core/utils/context_ext.dart';
 import '../../widgets/common/loading_widget.dart';
 import '../../widgets/err_state_widget/connection_timeout_widget.dart';
@@ -2348,10 +2351,13 @@ class SingleUiBuilder<T extends Object> extends StatefulWidget {
   // isCached
   bool? isCached;
 
+  T Function(dynamic)? fromJson;
+
   SingleUiBuilder(
       {Key? key,
       required this.url,
       required this.widget,
+      this.fromJson,
       this.urlId = "",
       this.isBaseUrl = true,
       this.map,
@@ -2371,17 +2377,18 @@ class SingleUiBuilder<T extends Object> extends StatefulWidget {
       : super(key: key);
 
   @override
-  SingleUiBuilderState createState() => SingleUiBuilderState<T>();
+  SingleUiBuilderState<T> createState() => SingleUiBuilderState<T>();
 }
 
-class SingleUiBuilderState<T> extends State<SingleUiBuilder> {
+class SingleUiBuilderState<T extends Object> extends State<SingleUiBuilder<T>> {
   late SingleUiBloc<T> bloc;
   @override
   void initState() {
     super.initState();
 
-    bloc =
-        SingleUiBloc<T>(widget.url + widget.urlId, isBaseUrl: widget.isBaseUrl);
+    bloc = SingleUiBloc<T>(widget.url + widget.urlId,
+            isBaseUrl: widget.isBaseUrl,
+            fromJson: widget.fromJson);
 
     bloc.getData(
         map: widget.map,
@@ -2409,6 +2416,7 @@ class SingleUiBuilderState<T> extends State<SingleUiBuilder> {
 
   @override
   void dispose() {
+    bloc.dispose();
     super.dispose();
   }
 
@@ -2640,9 +2648,10 @@ import 'package:rxdart/rxdart.dart';
 
 import '../../core/constants/app_constant.dart';
 import '../../core/network/basenetwork.dart';
-import '../../core/ob/response_ob.dart';
+import '../../core/models/response_ob.dart';
 
-class RequestButtonBloc extends DioBaseNetwork {
+class RequestButtonBloc {
+  final DioBaseNetwork _network = DioBaseNetwork();
   PublishSubject<ResponseOb> requestButtonController = PublishSubject();
   Stream<ResponseOb> getRequestStream() => requestButtonController.stream;
 
@@ -2657,7 +2666,7 @@ class RequestButtonBloc extends DioBaseNetwork {
     if (requestShowLoading) {
       requestButtonController.sink.add(resp);
     }
-    dioReq(requestType, url: MAIN_URL + url, params: map, fd: fd,
+    _network.dioReq(requestType, url: MAIN_URL + url, params: map, fd: fd,
         callBack: (ResponseOb rv) {
       if (rv.message == MsgState.data) {
         if (rv.data["result"].toString() == "1") {
@@ -2695,7 +2704,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/network/basenetwork.dart';
-import '../../core/ob/response_ob.dart';
+import '../../core/models/response_ob.dart';
 import '../../core/providers/theme_provider.dart';
 import '../../core/utils/app_util.dart';
 import '../../widgets/common/loading_widget.dart';
