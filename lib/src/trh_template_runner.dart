@@ -2,17 +2,14 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:args/args.dart';
+import 'package:mason_logger/mason_logger.dart';
 
 import 'template_contents.dart';
 
 const _currentCliVersion = '0.1.3';
 const _repoUrl = 'https://github.com/thurain11/trh_flutter_template.git';
-const _ansiReset = '\x1B[0m';
-const _ansiYellow = '\x1B[33m';
-const _ansiGreen = '\x1B[32m';
-const _ansiCyan = '\x1B[36m';
-const _ansiRed = '\x1B[31m';
-const _ansiBold = '\x1B[1m';
+
+final _logger = Logger();
 
 const _folders = <String>[
   'lib/builders',
@@ -192,7 +189,7 @@ Future<void> runTrhTemplate(List<String> arguments) async {
   try {
     results = parser.parse(arguments);
   } on FormatException catch (error) {
-    stderr.writeln('Error: ${error.message}');
+    _logger.err('Error: ${error.message}');
     _printUsage(parser);
     exitCode = 64;
     return;
@@ -204,11 +201,11 @@ Future<void> runTrhTemplate(List<String> arguments) async {
   }
 
   if (results['version'] as bool) {
-    stdout.writeln('trh_template $_currentCliVersion');
-    final updateMessage = await _buildUpdateMessage();
-    if (updateMessage != null) {
-      stdout.writeln(updateMessage);
-    }
+    _logger.info(
+      '${lightCyan.wrap(styleBold.wrap('trh_template'))} '
+      '${lightGreen.wrap(_currentCliVersion)}',
+    );
+    await _showUpdateBanner();
     return;
   }
 
@@ -218,17 +215,14 @@ Future<void> runTrhTemplate(List<String> arguments) async {
     return;
   }
 
-  final updateMessage = await _buildUpdateMessage();
-  if (updateMessage != null) {
-    stdout.writeln(updateMessage);
-  }
+  await _showUpdateBanner();
 
   final pathInput = (results['path'] as String?)?.trim();
   final targetPath = pathInput == null || pathInput.isEmpty ? '.' : pathInput;
   final targetDir = Directory(targetPath);
 
   if (!targetDir.existsSync()) {
-    stderr.writeln('Error: target path does not exist: ${targetDir.path}');
+    _logger.err('Target path does not exist: ${targetDir.path}');
     exitCode = 66;
     return;
   }
@@ -236,8 +230,8 @@ Future<void> runTrhTemplate(List<String> arguments) async {
   final isFlutterProject = _isFlutterProject(targetDir.path);
   final force = results['force'] as bool;
   if (!isFlutterProject && !force) {
-    stderr.writeln(
-      'Error: `${targetDir.path}` is not a Flutter project. '
+    _logger.err(
+      '`${targetDir.path}` is not a Flutter project. '
       'Run inside a Flutter project or use --force.',
     );
     exitCode = 65;
@@ -254,7 +248,7 @@ Future<void> runTrhTemplate(List<String> arguments) async {
       _runPage(targetDir.path, results.command!, dryRun: dryRun);
       return;
     default:
-      stderr.writeln('Unknown command: $command');
+      _logger.err('Unknown command: $command');
       _printUsage(parser);
       exitCode = 64;
       return;
@@ -309,20 +303,22 @@ void _runInit(
     alreadyExists: alreadyExists,
   );
 
-  stdout.writeln('TRH template scaffold finished for: $targetPath');
+  _logger.success('TRH template scaffold finished for: $targetPath');
   if (created.isNotEmpty) {
-    stdout.writeln('Created:');
+    _logger.info('');
+    _logger.info(styleBold.wrap('Created:')!);
     for (final folder in created) {
-      stdout.writeln('  - $folder');
+      _logger.info('  ${lightGreen.wrap('✓')} $folder');
     }
   } else {
-    stdout.writeln('Created: none');
+    _logger.info('Created: none');
   }
 
   if (alreadyExists.isNotEmpty) {
-    stdout.writeln('Already existed:');
+    _logger.info('');
+    _logger.info(styleBold.wrap('Already existed:')!);
     for (final folder in alreadyExists) {
-      stdout.writeln('  - $folder');
+      _logger.info('  ${darkGray.wrap('●')} ${darkGray.wrap(folder)!}');
     }
   }
 }
@@ -421,14 +417,14 @@ void _runPage(
 }) {
   final inputName = (results['name'] as String?)?.trim() ?? '';
   if (inputName.isEmpty) {
-    stderr.writeln('Error: page name is required. Use --name <value>.');
+    _logger.err('Page name is required. Use --name <value>.');
     exitCode = 64;
     return;
   }
 
   final pageName = _toSnakeCase(inputName);
   if (pageName.isEmpty) {
-    stderr.writeln('Error: page name must include letters or numbers.');
+    _logger.err('Page name must include letters or numbers.');
     exitCode = 64;
     return;
   }
@@ -469,17 +465,19 @@ void _runPage(
     alreadyExists.add('lib/pages/$pageName/${pageName}_page.dart');
   }
 
-  stdout.writeln('Page generation finished: $pageName');
+  _logger.success('Page generation finished: $pageName');
   if (created.isNotEmpty) {
-    stdout.writeln('Created:');
+    _logger.info('');
+    _logger.info(styleBold.wrap('Created:')!);
     for (final item in created) {
-      stdout.writeln('  - $item');
+      _logger.info('  ${lightGreen.wrap('✓')} $item');
     }
   }
   if (alreadyExists.isNotEmpty) {
-    stdout.writeln('Already existed:');
+    _logger.info('');
+    _logger.info(styleBold.wrap('Already existed:')!);
     for (final item in alreadyExists) {
-      stdout.writeln('  - $item');
+      _logger.info('  ${darkGray.wrap('●')} ${darkGray.wrap(item)!}');
     }
   }
 }
@@ -546,13 +544,22 @@ class _${className}PageState extends State<${className}Page> {
 }
 
 void _printUsage(ArgParser parser) {
-  stdout.writeln('Usage: trh_template [options] [command]');
-  stdout.writeln(parser.usage);
-  stdout.writeln('');
-  stdout.writeln('Commands:');
-  stdout.writeln('  init                   Create base lib folders');
-  stdout.writeln('  upgrade | update       Upgrade CLI from GitHub');
-  stdout.writeln('  page --name <name>     Create page folder and page file');
+  _logger.info('');
+  _logger.info(
+    '${styleBold.wrap(lightCyan.wrap('trh_template'))} — '
+    'TRH Flutter Template Scaffolder',
+  );
+  _logger.info('');
+  _logger.info(styleBold.wrap('Usage:')!);
+  _logger.info('  trh_template [options] [command]');
+  _logger.info('');
+  _logger.info(parser.usage);
+  _logger.info('');
+  _logger.info(styleBold.wrap('Commands:')!);
+  _logger.info('  ${lightGreen.wrap('init')}                   Create base lib folders');
+  _logger.info('  ${lightGreen.wrap('upgrade | update')}       Upgrade CLI from GitHub');
+  _logger.info('  ${lightGreen.wrap('page')} --name <name>     Create page folder and page file');
+  _logger.info('');
 }
 
 bool _isFlutterProject(String path) {
@@ -565,7 +572,7 @@ bool _isFlutterProject(String path) {
   return RegExp(r'^\s*flutter\s*:', multiLine: true).hasMatch(content);
 }
 
-Future<String?> _buildUpdateMessage() async {
+Future<void> _showUpdateBanner() async {
   try {
     final cacheFile = _updateCacheFile();
     final cache = _readUpdateCache(cacheFile);
@@ -579,7 +586,8 @@ Future<String?> _buildUpdateMessage() async {
       if (checkedAt != null && latestRaw != null) {
         final age = now.difference(checkedAt);
         if (age.inHours < 12) {
-          return _renderUpdateMessageIfNeeded(latestRaw);
+          _printUpdateBanner(latestRaw);
+          return;
         }
       }
     }
@@ -587,16 +595,79 @@ Future<String?> _buildUpdateMessage() async {
     final latest =
         await _fetchLatestVersion().timeout(const Duration(seconds: 5));
     if (latest == null) {
-      return cache == null
-          ? null
-          : _renderUpdateMessageIfNeeded(cache['latestVersion'] as String?);
+      if (cache != null) {
+        _printUpdateBanner(cache['latestVersion'] as String?);
+      }
+      return;
     }
 
     _writeUpdateCache(cacheFile, latestVersion: latest, checkedAtUtc: now);
-    return _renderUpdateMessageIfNeeded(latest);
-  } catch (_) {
-    return null;
+    _printUpdateBanner(latest);
+  } catch (_) {}
+}
+
+void _printUpdateBanner(String? latestRaw) {
+  if (latestRaw == null || latestRaw.trim().isEmpty) {
+    return;
   }
+  final latest = _normalizeVersion(latestRaw);
+  if (_compareVersions(_currentCliVersion, latest) >= 0) {
+    return;
+  }
+
+  // Build the content lines (plain text for width calculation).
+  final lines = <({String plain, String styled})>[
+    (
+      plain: '⚡ UPDATE AVAILABLE',
+      styled: lightYellow.wrap(styleBold.wrap('⚡ UPDATE AVAILABLE'))!,
+    ),
+    (
+      plain: '',
+      styled: '',
+    ),
+    (
+      plain: 'Version: $_currentCliVersion → $latest',
+      styled: 'Version: ${yellow.wrap(_currentCliVersion)} '
+          '${lightYellow.wrap('→')} '
+          '${lightGreen.wrap(styleBold.wrap(latest))}',
+    ),
+    (
+      plain: 'Run: trh_template upgrade',
+      styled: 'Run: ${lightCyan.wrap(styleBold.wrap('trh_template upgrade'))}',
+    ),
+  ];
+
+  // Calculate box width.
+  final maxWidth = lines.fold<int>(
+    0,
+    (prev, line) => line.plain.length > prev ? line.plain.length : prev,
+  );
+  final innerWidth = maxWidth + 2; // 1 space padding each side
+
+  // Build borders.
+  final borderColor = yellow;
+  final top = borderColor.wrap('╔${'═' * innerWidth}╗')!;
+  final bottom = borderColor.wrap('╚${'═' * innerWidth}╝')!;
+  final emptyRow = '${borderColor.wrap('║')} ${' ' * maxWidth} ${borderColor.wrap('║')}';
+
+  // Build body rows.
+  final bodyRows = <String>[];
+  for (final line in lines) {
+    final pad = ' ' * (maxWidth - line.plain.length);
+    bodyRows.add(
+      '${borderColor.wrap('║')} ${line.styled}$pad ${borderColor.wrap('║')}',
+    );
+  }
+
+  _logger.info('');
+  _logger.info(top);
+  _logger.info(emptyRow);
+  for (final row in bodyRows) {
+    _logger.info(row);
+  }
+  _logger.info(emptyRow);
+  _logger.info(bottom);
+  _logger.info('');
 }
 
 File _updateCacheFile() {
@@ -738,23 +809,6 @@ String? _readGithubToken() {
 String _normalizeVersion(String raw) =>
     raw.trim().replaceFirst(RegExp(r'^[vV]'), '');
 
-String? _renderUpdateMessageIfNeeded(String? latestRaw) {
-  if (latestRaw == null || latestRaw.trim().isEmpty) {
-    return null;
-  }
-  final latest = _normalizeVersion(latestRaw);
-  if (_compareVersions(_currentCliVersion, latest) >= 0) {
-    return null;
-  }
-  final lines = <String>[
-    '${_stylize('UPDATE AVAILABLE', _ansiBold + _ansiYellow)}',
-    'Version: ${_stylize(_currentCliVersion, _ansiYellow)}'
-        ' -> ${_stylize(latest, _ansiGreen)}',
-    'Run: ${_stylize('trh_template upgrade', _ansiCyan)}',
-  ];
-  return _buildBox(lines);
-}
-
 int _compareVersions(String a, String b) {
   final pa = _parseVersionParts(a);
   final pb = _parseVersionParts(b);
@@ -777,10 +831,7 @@ List<int> _parseVersionParts(String version) {
 }
 
 Future<void> _runUpgrade() async {
-  stdout.writeln(
-    '${_stylize('↑', _ansiYellow)} '
-    '${_stylize('Upgrading trh_template from GitHub...', _ansiBold)}',
-  );
+  final progress = _logger.progress('Upgrading trh_template from GitHub');
   try {
     final process = await Process.start(
       'dart',
@@ -789,74 +840,23 @@ Future<void> _runUpgrade() async {
     );
     final code = await process.exitCode;
     if (code == 0) {
-      stdout.writeln(
-        '${_stylize('✓', _ansiGreen)} ${_stylize('Upgrade complete.', _ansiGreen)}',
-      );
-      stdout.writeln(
-        '  Verify: ${_stylize('trh_template --version', _ansiCyan)}',
+      progress.complete('Upgrade complete!');
+      _logger.info('');
+      _logger.success(
+        '  Verify: ${lightCyan.wrap('trh_template --version')}',
       );
     } else {
-      stderr.writeln(
-        '${_stylize('✗', _ansiRed)} '
-        '${_stylize('Upgrade failed with exit code $code.', _ansiRed)}',
-      );
+      progress.fail('Upgrade failed with exit code $code.');
       exitCode = code;
     }
   } catch (e) {
-    stderr.writeln(
-      '${_stylize('✗', _ansiRed)} ${_stylize('Upgrade failed: $e', _ansiRed)}',
-    );
-    stderr.writeln(
-      'Try manually: dart pub global activate --source git $_repoUrl',
+    progress.fail('Upgrade failed: $e');
+    _logger.info('');
+    _logger.info(
+      '  Try manually: '
+      '${lightCyan.wrap('dart pub global activate --source git $_repoUrl')}',
     );
     exitCode = 1;
   }
 }
 
-String _buildBox(List<String> lines) {
-  final visibleLines = lines.map(_stripAnsi).toList();
-  final maxWidth = visibleLines.fold<int>(
-    0,
-    (prev, line) => line.length > prev ? line.length : prev,
-  );
-
-  final top = '┌${'─' * (maxWidth + 2)}┐';
-  final bottom = '└${'─' * (maxWidth + 2)}┘';
-  final body = <String>[];
-  for (var i = 0; i < lines.length; i++) {
-    final plain = visibleLines[i];
-    final pad = ' ' * (maxWidth - plain.length);
-    body.add('│ ${lines[i]}$pad │');
-  }
-
-  final borderColor = _ansiYellow;
-  final plain = <String>[top, ...body, bottom].join('\n');
-  if (!_supportsAnsi()) {
-    return plain;
-  }
-  final coloredBody = <String>[];
-  for (var i = 0; i < lines.length; i++) {
-    final plain = visibleLines[i];
-    final pad = ' ' * (maxWidth - plain.length);
-    coloredBody.add(
-      '${_stylize('│', borderColor)} ${lines[i]}$pad ${_stylize('│', borderColor)}',
-    );
-  }
-
-  return '${_stylize(top, borderColor)}\n'
-      '${coloredBody.join('\n')}\n'
-      '${_stylize(bottom, borderColor)}';
-}
-
-bool _supportsAnsi() => stdout.supportsAnsiEscapes;
-
-String _stylize(String value, String colorCode) {
-  if (!_supportsAnsi()) {
-    return value;
-  }
-  return '$colorCode$value$_ansiReset';
-}
-
-String _stripAnsi(String input) {
-  return input.replaceAll(RegExp(r'\x1B\[[0-9;]*m'), '');
-}
