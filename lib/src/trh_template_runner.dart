@@ -6,7 +6,7 @@ import 'package:mason_logger/mason_logger.dart';
 
 import 'template_contents.dart';
 
-const _currentCliVersion = '0.1.3';
+const _currentCliVersion = '0.1.4';
 const _repoUrl = 'https://github.com/thurain11/trh_flutter_template.git';
 
 final _logger = Logger();

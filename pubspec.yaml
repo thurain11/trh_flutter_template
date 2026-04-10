@@ -1,6 +1,6 @@
 name: trh_template_cli
 description: A tiny CLI that scaffolds TRH Flutter lib folders.
-version: 0.1.3
+version: 0.1.4
 publish_to: none
 
 environment:
