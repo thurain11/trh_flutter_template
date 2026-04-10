@@ -7,6 +7,12 @@ import 'template_contents.dart';
 
 const _currentCliVersion = '0.1.0';
 const _repoUrl = 'https://github.com/thurain11/trh_flutter_template.git';
+const _ansiReset = '\x1B[0m';
+const _ansiYellow = '\x1B[33m';
+const _ansiGreen = '\x1B[32m';
+const _ansiCyan = '\x1B[36m';
+const _ansiRed = '\x1B[31m';
+const _ansiBold = '\x1B[1m';
 
 const _folders = <String>[
   'lib/builders',
@@ -165,6 +171,8 @@ Future<void> runTrhTemplate(List<String> arguments) async {
       help: 'Skip Flutter project validation.',
     )
     ..addCommand('init')
+    ..addCommand('upgrade')
+    ..addCommand('update')
     ..addCommand(
       'page',
       ArgParser()
@@ -197,6 +205,16 @@ Future<void> runTrhTemplate(List<String> arguments) async {
 
   if (results['version'] as bool) {
     stdout.writeln('trh_template $_currentCliVersion');
+    final updateMessage = await _buildUpdateMessage();
+    if (updateMessage != null) {
+      stdout.writeln(updateMessage);
+    }
+    return;
+  }
+
+  final command = results.command?.name;
+  if (command == 'upgrade' || command == 'update') {
+    await _runUpgrade();
     return;
   }
 
@@ -227,8 +245,6 @@ Future<void> runTrhTemplate(List<String> arguments) async {
   }
 
   final dryRun = results['dry-run'] as bool;
-  final command = results.command?.name;
-
   switch (command) {
     case null:
     case 'init':
@@ -535,6 +551,7 @@ void _printUsage(ArgParser parser) {
   stdout.writeln('');
   stdout.writeln('Commands:');
   stdout.writeln('  init                   Create base lib folders');
+  stdout.writeln('  upgrade | update       Upgrade CLI from GitHub');
   stdout.writeln('  page --name <name>     Create page folder and page file');
 }
 
@@ -712,9 +729,13 @@ String? _renderUpdateMessageIfNeeded(String? latestRaw) {
   if (_compareVersions(_currentCliVersion, latest) >= 0) {
     return null;
   }
-  return 'New trh_template version available: $latest '
-      '(current: $_currentCliVersion). Run: '
-      'dart pub global activate --source git $_repoUrl';
+  final lines = <String>[
+    '${_stylize('UPDATE AVAILABLE', _ansiBold + _ansiYellow)}',
+    'Version: ${_stylize(_currentCliVersion, _ansiYellow)}'
+        ' -> ${_stylize(latest, _ansiGreen)}',
+    'Run: ${_stylize('trh_template upgrade', _ansiCyan)}',
+  ];
+  return _buildBox(lines);
 }
 
 int _compareVersions(String a, String b) {
@@ -736,4 +757,89 @@ List<int> _parseVersionParts(String version) {
   final normalized = _normalizeVersion(version);
   final main = normalized.split('-').first;
   return main.split('.').map((part) => int.tryParse(part) ?? 0).toList();
+}
+
+Future<void> _runUpgrade() async {
+  stdout.writeln(
+    '${_stylize('↑', _ansiYellow)} '
+    '${_stylize('Upgrading trh_template from GitHub...', _ansiBold)}',
+  );
+  try {
+    final process = await Process.start(
+      'dart',
+      <String>['pub', 'global', 'activate', '--source', 'git', _repoUrl],
+      mode: ProcessStartMode.inheritStdio,
+    );
+    final code = await process.exitCode;
+    if (code == 0) {
+      stdout.writeln(
+        '${_stylize('✓', _ansiGreen)} ${_stylize('Upgrade complete.', _ansiGreen)}',
+      );
+      stdout.writeln(
+        '  Verify: ${_stylize('trh_template --version', _ansiCyan)}',
+      );
+    } else {
+      stderr.writeln(
+        '${_stylize('✗', _ansiRed)} '
+        '${_stylize('Upgrade failed with exit code $code.', _ansiRed)}',
+      );
+      exitCode = code;
+    }
+  } catch (e) {
+    stderr.writeln(
+      '${_stylize('✗', _ansiRed)} ${_stylize('Upgrade failed: $e', _ansiRed)}',
+    );
+    stderr.writeln(
+      'Try manually: dart pub global activate --source git $_repoUrl',
+    );
+    exitCode = 1;
+  }
+}
+
+String _buildBox(List<String> lines) {
+  final visibleLines = lines.map(_stripAnsi).toList();
+  final maxWidth = visibleLines.fold<int>(
+    0,
+    (prev, line) => line.length > prev ? line.length : prev,
+  );
+
+  final top = '┌${'─' * (maxWidth + 2)}┐';
+  final bottom = '└${'─' * (maxWidth + 2)}┘';
+  final body = <String>[];
+  for (var i = 0; i < lines.length; i++) {
+    final plain = visibleLines[i];
+    final pad = ' ' * (maxWidth - plain.length);
+    body.add('│ ${lines[i]}$pad │');
+  }
+
+  final borderColor = _ansiYellow;
+  final plain = <String>[top, ...body, bottom].join('\n');
+  if (!_supportsAnsi()) {
+    return plain;
+  }
+  final coloredBody = <String>[];
+  for (var i = 0; i < lines.length; i++) {
+    final plain = visibleLines[i];
+    final pad = ' ' * (maxWidth - plain.length);
+    coloredBody.add(
+      '${_stylize('│', borderColor)} ${lines[i]}$pad ${_stylize('│', borderColor)}',
+    );
+  }
+
+  return '${_stylize(top, borderColor)}\n'
+      '${coloredBody.join('\n')}\n'
+      '${_stylize(bottom, borderColor)}';
+}
+
+bool _supportsAnsi() => stdout.supportsAnsiEscapes;
+
+String _stylize(String value, String colorCode) {
+  if (!_supportsAnsi()) {
+    return value;
+  }
+  return '$colorCode$value$_ansiReset';
+}
+
+String _stripAnsi(String input) {
+  return input.replaceAll(RegExp(r'\x1B\[[0-9;]*m'), '');
 }

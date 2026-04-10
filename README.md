@@ -110,6 +110,12 @@ dart pub global activate --source git https://github.com/thurain11/trh_flutter_t
 dart pub global activate --source git https://github.com/thurain11/trh_flutter_template.git
 ```
 
+or use built-in command:
+
+```bash
+trh_template upgrade
+```
+
 `trh_template` command run တိုင်း (12 hours cache နဲ့) GitHub latest version စစ်ပေးပြီး update ရှိရင် command hint ပြပါမယ်။
 
 Check current installed version:
@@ -180,6 +186,7 @@ trh_template --help
 ## Commands
 
 - `trh_template` or `trh_template init` creates base folders + `core` subfolders
+- `trh_template upgrade` (or `trh_template update`) upgrades CLI to latest from GitHub
 - `trh_template page --name <name>` creates:
   - `lib/pages/<name>/`
   - `lib/pages/<name>/<name>_page.dart`
